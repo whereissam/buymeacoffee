@@ -10,12 +10,31 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as FeaturesRouteImport } from './routes/features'
+import { Route as FactoryRouteImport } from './routes/factory'
+import { Route as ContractPreviewRouteImport } from './routes/contract-preview'
+import { Route as CoffeeRouteImport } from './routes/coffee'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FactoryStepRouteImport } from './routes/factory.$step'
 
 const FeaturesRoute = FeaturesRouteImport.update({
   id: '/features',
   path: '/features',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FactoryRoute = FactoryRouteImport.update({
+  id: '/factory',
+  path: '/factory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContractPreviewRoute = ContractPreviewRouteImport.update({
+  id: '/contract-preview',
+  path: '/contract-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoffeeRoute = CoffeeRouteImport.update({
+  id: '/coffee',
+  path: '/coffee',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -28,34 +47,76 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FactoryStepRoute = FactoryStepRouteImport.update({
+  id: '/$step',
+  path: '/$step',
+  getParentRoute: () => FactoryRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/coffee': typeof CoffeeRoute
+  '/contract-preview': typeof ContractPreviewRoute
+  '/factory': typeof FactoryRouteWithChildren
   '/features': typeof FeaturesRoute
+  '/factory/$step': typeof FactoryStepRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/coffee': typeof CoffeeRoute
+  '/contract-preview': typeof ContractPreviewRoute
+  '/factory': typeof FactoryRouteWithChildren
   '/features': typeof FeaturesRoute
+  '/factory/$step': typeof FactoryStepRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/coffee': typeof CoffeeRoute
+  '/contract-preview': typeof ContractPreviewRoute
+  '/factory': typeof FactoryRouteWithChildren
   '/features': typeof FeaturesRoute
+  '/factory/$step': typeof FactoryStepRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/features'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/coffee'
+    | '/contract-preview'
+    | '/factory'
+    | '/features'
+    | '/factory/$step'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/features'
-  id: '__root__' | '/' | '/about' | '/features'
+  to:
+    | '/'
+    | '/about'
+    | '/coffee'
+    | '/contract-preview'
+    | '/factory'
+    | '/features'
+    | '/factory/$step'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/coffee'
+    | '/contract-preview'
+    | '/factory'
+    | '/features'
+    | '/factory/$step'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  CoffeeRoute: typeof CoffeeRoute
+  ContractPreviewRoute: typeof ContractPreviewRoute
+  FactoryRoute: typeof FactoryRouteWithChildren
   FeaturesRoute: typeof FeaturesRoute
 }
 
@@ -66,6 +127,27 @@ declare module '@tanstack/react-router' {
       path: '/features'
       fullPath: '/features'
       preLoaderRoute: typeof FeaturesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/factory': {
+      id: '/factory'
+      path: '/factory'
+      fullPath: '/factory'
+      preLoaderRoute: typeof FactoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contract-preview': {
+      id: '/contract-preview'
+      path: '/contract-preview'
+      fullPath: '/contract-preview'
+      preLoaderRoute: typeof ContractPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coffee': {
+      id: '/coffee'
+      path: '/coffee'
+      fullPath: '/coffee'
+      preLoaderRoute: typeof CoffeeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -82,12 +164,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/factory/$step': {
+      id: '/factory/$step'
+      path: '/$step'
+      fullPath: '/factory/$step'
+      preLoaderRoute: typeof FactoryStepRouteImport
+      parentRoute: typeof FactoryRoute
+    }
   }
 }
+
+interface FactoryRouteChildren {
+  FactoryStepRoute: typeof FactoryStepRoute
+}
+
+const FactoryRouteChildren: FactoryRouteChildren = {
+  FactoryStepRoute: FactoryStepRoute,
+}
+
+const FactoryRouteWithChildren =
+  FactoryRoute._addFileChildren(FactoryRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  CoffeeRoute: CoffeeRoute,
+  ContractPreviewRoute: ContractPreviewRoute,
+  FactoryRoute: FactoryRouteWithChildren,
   FeaturesRoute: FeaturesRoute,
 }
 export const routeTree = rootRouteImport
