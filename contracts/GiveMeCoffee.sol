@@ -1,123 +1,67 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.27;
+pragma solidity ^0.8.20;
 
-contract GiveMeCoffee {
-    address public owner;
-    uint256 public totalDonations;
-    
-    struct Donation {
-        address donor;
-        uint256 amount;
-        string message;
-        uint256 timestamp;
-    }
-    
-    Donation[] public donations;
-    
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+/// @title GiveMeCoffee - Shared tipping protocol for Base
+/// @notice One contract serves all creators. Non-custodial: each creator withdraws their own balance.
+contract GiveMeCoffee is ReentrancyGuard {
+    mapping(address => uint256) public balances;
+    mapping(address => uint256) public totalDonatedLifetime;
+
     event DonationReceived(
+        address indexed creator,
         address indexed donor,
         uint256 amount,
         string message,
         uint256 timestamp
     );
-    
+
     event WithdrawalMade(
-        address indexed recipient,
+        address indexed creator,
         uint256 amount,
         uint256 timestamp
     );
-    
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
-        _;
+
+    /// @notice Donate ETH to a creator with an optional short message
+    /// @param creator The address of the creator to tip
+    /// @param message A short memo (max 64 bytes)
+    function donate(address creator, string calldata message) external payable {
+        require(msg.value > 0, "Must send ETH");
+        require(creator != address(0), "Invalid creator");
+        require(bytes(message).length <= 64, "Message too long");
+
+        balances[creator] += msg.value;
+        totalDonatedLifetime[creator] += msg.value;
+
+        emit DonationReceived(creator, msg.sender, msg.value, message, block.timestamp);
     }
-    
-    constructor() {
-        owner = msg.sender;
-    }
-    
+
+    /// @notice Direct ETH transfers are rejected to force proper attribution via donate()
     receive() external payable {
-        require(msg.value > 0, "Donation must be greater than 0");
-        totalDonations += msg.value;
-        
-        donations.push(Donation({
-            donor: msg.sender,
-            amount: msg.value,
-            message: "",
-            timestamp: block.timestamp
-        }));
-        
-        emit DonationReceived(msg.sender, msg.value, "", block.timestamp);
+        revert("Use donate()");
     }
-    
-    function donate(string memory _message) external payable {
-        require(msg.value > 0, "Donation must be greater than 0");
-        totalDonations += msg.value;
-        
-        donations.push(Donation({
-            donor: msg.sender,
-            amount: msg.value,
-            message: _message,
-            timestamp: block.timestamp
-        }));
-        
-        emit DonationReceived(msg.sender, msg.value, _message, block.timestamp);
+
+    /// @notice Creator withdraws their full accumulated balance
+    function withdraw() external nonReentrant {
+        uint256 amount = balances[msg.sender];
+        require(amount > 0, "No balance");
+
+        balances[msg.sender] = 0;
+
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit WithdrawalMade(msg.sender, amount, block.timestamp);
     }
-    
-    function withdraw() external onlyOwner {
-        uint256 balance = address(this).balance;
-        require(balance > 0, "No funds to withdraw");
-        
-        (bool success, ) = payable(owner).call{value: balance}("");
-        require(success, "Withdrawal failed");
-        
-        emit WithdrawalMade(owner, balance, block.timestamp);
+
+    /// @notice Get a creator's current withdrawable balance
+    function getBalance(address creator) external view returns (uint256) {
+        return balances[creator];
     }
-    
-    function getBalance() external view returns (uint256) {
-        return address(this).balance;
-    }
-    
-    function getDonationCount() external view returns (uint256) {
-        return donations.length;
-    }
-    
-    function getDonation(uint256 index) external view returns (
-        address donor,
-        uint256 amount,
-        string memory message,
-        uint256 timestamp
-    ) {
-        require(index < donations.length, "Donation index out of bounds");
-        Donation memory donation = donations[index];
-        return (donation.donor, donation.amount, donation.message, donation.timestamp);
-    }
-    
-    function getRecentDonations(uint256 count) external view returns (
-        address[] memory donors,
-        uint256[] memory amounts,
-        string[] memory messages,
-        uint256[] memory timestamps
-    ) {
-        uint256 totalCount = donations.length;
-        uint256 returnCount = count > totalCount ? totalCount : count;
-        
-        if (returnCount == 0) {
-            return (new address[](0), new uint256[](0), new string[](0), new uint256[](0));
-        }
-        
-        donors = new address[](returnCount);
-        amounts = new uint256[](returnCount);
-        messages = new string[](returnCount);
-        timestamps = new uint256[](returnCount);
-        
-        for (uint256 i = 0; i < returnCount; i++) {
-            uint256 donationIndex = totalCount - 1 - i;
-            Donation memory donation = donations[donationIndex];
-            donors[i] = donation.donor;
-            amounts[i] = donation.amount;
-            messages[i] = donation.message;
-            timestamps[i] = donation.timestamp;
-        }
+
+    /// @notice Get a creator's lifetime total donations received
+    function getLifetimeTotal(address creator) external view returns (uint256) {
+        return totalDonatedLifetime[creator];
     }
 }
