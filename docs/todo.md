@@ -3,83 +3,89 @@
 ## Phase 1: Foundation (Week 1)
 
 ### Smart Contract
-- [ ] Write `GiveMeCoffee.sol` shared protocol contract
-  - [ ] `donate(address creator, string calldata message)` with 64-byte cap
-  - [ ] `withdraw()` with ReentrancyGuard, low-level `call`
-  - [ ] `balances` mapping (withdrawable) separate from `totalDonatedLifetime`
-  - [ ] `receive()` reverts to force `donate()` usage
-  - [ ] Events: `DonationReceived` (indexed creator + donor), `WithdrawalMade`
-  - [ ] View functions: `getBalance()`, `getLifetimeTotal()`
-- [ ] Write Hardhat unit tests
-  - [ ] Donate with valid message
-  - [ ] Donate with empty message
-  - [ ] Donate rejects 0 ETH
-  - [ ] Donate rejects message > 64 bytes
-  - [ ] Withdraw full balance
-  - [ ] Withdraw with 0 balance reverts
-  - [ ] Reentrancy attack test
-  - [ ] Multiple creators, correct balance tracking
-  - [ ] `receive()` reverts
-  - [ ] Events emitted correctly
-- [ ] Deploy script for Base Sepolia
+- [x] Write `GiveMeCoffee.sol` shared protocol contract
+  - [x] `donate(address creator, string calldata message)` with 64-byte cap
+  - [x] `withdraw()` with ReentrancyGuard, low-level `call`
+  - [x] `balances` mapping (withdrawable) separate from `totalDonatedLifetime`
+  - [x] `receive()` reverts to force `donate()` usage
+  - [x] Events: `DonationReceived` (indexed creator + donor), `WithdrawalMade`
+  - [x] View functions: `getBalance()`, `getLifetimeTotal()`
+- [x] Write Foundry unit tests (14/14 passing)
+  - [x] Donate with valid message
+  - [x] Donate with empty message
+  - [x] Donate rejects 0 ETH
+  - [x] Donate rejects message > 64 bytes
+  - [x] Donate accepts exactly 64 bytes
+  - [x] Donate rejects zero address creator
+  - [x] Withdraw full balance
+  - [x] Withdraw with 0 balance reverts
+  - [x] Reentrancy attack test
+  - [x] Multiple creators, correct balance tracking
+  - [x] `receive()` reverts
+  - [x] Events emitted correctly
+  - [x] Withdraw does not affect other creators
+- [x] Deploy script for Base Sepolia (`script/Deploy.s.sol`)
+- [x] Local Anvil node integration test (deploy + donate + withdraw + reverts)
 
 ### Dev Environment
-- [ ] Configure Hardhat for Base Sepolia + Base Mainnet
-- [ ] Set up wagmi + viem (replace ethers.js)
-- [ ] Configure WalletConnect / Reown AppKit
-- [ ] Verify existing Vite + React + TailwindCSS v4 setup works
+- [x] Configure Foundry for Base Sepolia + Base Mainnet (`foundry.toml`)
+- [x] Removed Hardhat (replaced with Foundry)
+- [x] OpenZeppelin contracts installed via `forge install`
+- [x] Set up wagmi + viem (replace ethers.js)
+- [x] Configure WalletConnect / Reown AppKit
+- [x] Verify existing Vite + React + TailwindCSS v4 setup works
 
 ## Phase 2: Frontend Core (Week 2-3)
 
 ### Creator Setup Flow
-- [ ] Creator connects wallet (proves ownership)
-- [ ] Creator configuration form
-  - [ ] Display name
-  - [ ] Description
-  - [ ] Suggested donation amounts (preset or custom)
-  - [ ] Theme selection
-- [ ] Generate creator ID / slug
-- [ ] Output: hosted page URL, iframe embed code, GitHub badge markdown
-- [ ] Store widget config (localStorage for MVP, backend later)
+- [x] Creator connects wallet (proves ownership)
+- [x] Creator configuration form
+  - [x] Display name
+  - [x] Description
+  - [x] Suggested donation amounts (preset or custom)
+  - [x] Theme selection
+- [x] Generate creator ID / slug
+- [x] Output: hosted page URL, iframe embed code, GitHub badge markdown
+- [x] Store widget config (localStorage for MVP, backend later)
 
 ### Hosted Donation Page (`/tip/:creatorId`)
-- [ ] Display creator info (name, description)
-- [ ] Wallet connect button (wagmi)
-- [ ] Network detection + auto-switch prompt to Base
-- [ ] Preset amount buttons + custom amount input
-- [ ] Optional message input (64 char limit shown in UI)
-- [ ] Transaction state machine UI:
-  - [ ] Idle
-  - [ ] Connecting wallet
-  - [ ] Wrong network (with switch button)
-  - [ ] Awaiting signature
-  - [ ] Pending (with tx hash link to BaseScan)
-  - [ ] Success (with confirmation)
-  - [ ] Failed (with error message)
-- [ ] Mobile responsive
+- [x] Display creator info (name, description)
+- [x] Wallet connect button (wagmi)
+- [x] Network detection + auto-switch prompt to Base
+- [x] Preset amount buttons + custom amount input
+- [x] Optional message input (64 char limit shown in UI)
+- [x] Transaction state machine UI:
+  - [x] Idle
+  - [x] Connecting wallet
+  - [x] Wrong network (with switch button)
+  - [x] Awaiting signature
+  - [x] Pending (with tx hash link to BaseScan)
+  - [x] Success (with confirmation)
+  - [x] Failed (with error message)
+- [x] Mobile responsive
 
 ### Iframe Embed Version
-- [ ] `/embed/:creatorId` route - minimal chrome, iframe-friendly
-- [ ] Same functionality as hosted page
-- [ ] Proper iframe sizing and styling
+- [x] `/embed/:creatorId` route - minimal chrome, iframe-friendly
+- [x] Same functionality as hosted page
+- [x] Proper iframe sizing and styling
 
 ## Phase 3: Polish & Integration (Week 4)
 
 ### Themes
-- [ ] Coffee Shop (amber/orange)
-- [ ] Modern (blue/purple)
-- [ ] Minimal (gray tones)
-- [ ] Fun & Colorful (pink/yellow)
+- [x] Coffee Shop (amber/orange)
+- [x] Modern (blue/purple)
+- [x] Minimal (gray tones)
+- [x] Fun & Colorful (pink/yellow)
 
 ### GitHub README Integration
-- [ ] Badge image generation or hosted badge URL
-- [ ] Markdown snippet for creators to copy
+- [x] Badge image generation or hosted badge URL
+- [x] Markdown snippet for creators to copy
 
 ### UX Polish
-- [ ] Loading states and skeleton UI
-- [ ] Error messages are clear and actionable
-- [ ] Mobile wallet deep-link handling
-- [ ] Haptic/visual feedback on successful tip
+- [x] Loading states and skeleton UI
+- [x] Error messages are clear and actionable
+- [x] Mobile wallet deep-link handling
+- [x] Haptic/visual feedback on successful tip
 
 ## Phase 4: Testing & Security (Week 5)
 
