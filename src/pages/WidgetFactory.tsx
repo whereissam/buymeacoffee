@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from '@tanstack/react-router';
-import { useWeb3 } from '../contexts/Web3Context';
+import { useWeb3 } from '../hooks/useWeb3';
 import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
-import { ethers } from 'ethers';
-import { ContractDeployer, DeploymentResult, DeploymentConfig } from '../utils/contractDeployer';
 
 interface WidgetConfig {
   title: string;
@@ -53,13 +51,12 @@ const THEMES = {
 };
 
 export const WidgetFactory = () => {
-  const { isConnected, connectWallet, signer, userAddress, network, isCorrectNetwork, switchToBase, disconnect } = useWeb3();
+  const { isConnected, connectWallet, userAddress, chainId, isCorrectNetwork, switchToBase, disconnect } = useWeb3();
   const navigate = useNavigate();
   const params = useParams({ strict: false });
   const [currentStep, setCurrentStep] = useState(1);
   const [isDeploying, setIsDeploying] = useState(false);
-  const [deploymentResult, setDeploymentResult] = useState<DeploymentResult | null>(null);
-  const [deploymentCost, setDeploymentCost] = useState<string>('0.001');
+  const [deploymentResult, setDeploymentResult] = useState<{contractAddress: string; creatorAddress: string} | null>(null);
   const [widgetConfig, setWidgetConfig] = useState<WidgetConfig>({
     title: "Buy Me a Coffee! ☕",
     description: "Support my work with a coffee!",
@@ -119,9 +116,9 @@ export const WidgetFactory = () => {
     saveProgress(step, widgetConfig, deploymentResult);
   };
 
-  const getNetworkName = (chainId: bigint | undefined): string => {
-    if (!chainId) return 'Unknown';
-    switch (Number(chainId)) {
+  const getNetworkName = (id: bigint | number | null | undefined): string => {
+    if (!id) return 'Unknown';
+    switch (Number(id)) {
       case 8453: return 'Base Mainnet';
       case 84532: return 'Base Sepolia';
       case 1: return 'Ethereum Mainnet';
@@ -153,68 +150,46 @@ export const WidgetFactory = () => {
     saveProgress(currentStep, widgetConfig, deploymentResult);
   }, [widgetConfig]);
 
-  const deployContract = async () => {
-    if (!signer) return;
+  const registerCreator = async () => {
+    if (!userAddress) return;
 
     try {
       setIsDeploying(true);
-      
-      // Validate network first
-      const isValidNetwork = await ContractDeployer.validateNetwork(signer);
-      if (!isValidNetwork) {
-        throw new Error('Please switch to Base Sepolia network');
-      }
-      
-      // Prepare deployment configuration
-      const deploymentConfig: DeploymentConfig = {
-        creatorName: widgetConfig.creatorName,
-        title: widgetConfig.title,
-        description: widgetConfig.description,
-        website: widgetConfig.website
+
+      // With the shared contract model, no deployment is needed.
+      // The creator just registers their wallet address.
+      const contractAddr = import.meta.env.VITE_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000';
+
+      const result = {
+        contractAddress: contractAddr,
+        creatorAddress: userAddress,
       };
-      
-      // Deploy the contract
-      const deployer = new ContractDeployer(signer);
-      const result = await deployer.deployGiveMeCoffeeContract(deploymentConfig);
-      
+
       setDeploymentResult(result);
-      
-      // Show success notification
-      alert('🎉 Deployment successful! Your coffee shop is now live on Base blockchain!');
-      
-      // Save deployment result and move to final step
+
+      // Save and move to final step
       saveProgress(4, widgetConfig, result);
       updateStep(4);
-      
+
     } catch (error) {
-      console.error('Deployment failed:', error);
-      alert(`Deployment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Registration failed:', error);
+      alert(`Registration failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsDeploying(false);
     }
   };
 
-  // Load deployment cost estimate when signer is available
-  useEffect(() => {
-    if (signer) {
-      ContractDeployer.estimateDeploymentCost(signer).then(setDeploymentCost);
-    }
-  }, [signer]);
-
   const generateEmbedCode = () => {
     if (!deploymentResult) return '';
     
     const embedCode = `<!-- Give Me Coffee Widget -->
-<div id="give-me-coffee-widget"></div>
-<script>
-  window.coffeeWidgetConfig = {
-    contractAddress: "${deploymentResult.contractAddress}",
-    title: "${widgetConfig.title}",
-    theme: "${widgetConfig.theme}",
-    features: ${JSON.stringify(widgetConfig.features)}
-  };
-</script>
-<script src="https://your-domain.com/widget.js"></script>`;
+<iframe
+  src="https://your-domain.com/embed/${deploymentResult.creatorAddress}"
+  width="400"
+  height="500"
+  frameborder="0"
+  title="${widgetConfig.title}"
+></iframe>`;
 
     return embedCode;
   };
@@ -519,7 +494,7 @@ export const WidgetFactory = () => {
                           <div>
                             <h3 className="text-lg font-semibold text-foreground">Ready to Deploy!</h3>
                             <p className="text-muted-foreground text-sm">
-                              Your contract will be deployed to {getNetworkName(network?.chainId)}
+                              Your contract will be deployed to {getNetworkName(chainId ? BigInt(chainId) : undefined)}
                             </p>
                           </div>
                         </div>
@@ -539,11 +514,11 @@ export const WidgetFactory = () => {
                           </div>
                           <div className="bg-card border-2 border-border rounded-lg p-4 text-center shadow-sm">
                             <div className="text-primary font-semibold text-sm mb-1">Network</div>
-                            <div className="text-xs text-foreground">{getNetworkName(network?.chainId)}</div>
+                            <div className="text-xs text-foreground">{getNetworkName(chainId ? BigInt(chainId) : undefined)}</div>
                           </div>
                           <div className="bg-card border-2 border-border rounded-lg p-4 text-center shadow-sm">
-                            <div className="text-primary font-semibold text-sm mb-1">Gas Cost</div>
-                            <div className="text-xs text-foreground">~{deploymentCost} ETH</div>
+                            <div className="text-primary font-semibold text-sm mb-1">Model</div>
+                            <div className="text-xs text-foreground">Shared Contract (no gas)</div>
                           </div>
                         </div>
                       </div>
@@ -582,7 +557,7 @@ export const WidgetFactory = () => {
                         <div className="bg-card border-2 border-border rounded-lg p-4 text-center shadow-sm relative group">
                           <div className="text-destructive font-semibold text-sm mb-1">Current Wallet</div>
                           <div className="text-xs text-foreground">{userAddress?.slice(0, 6)}...{userAddress?.slice(-4)}</div>
-                          <div className="text-xs text-muted-foreground mt-1">{getNetworkName(network?.chainId)}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{getNetworkName(chainId ? BigInt(chainId) : undefined)}</div>
                           <button
                             onClick={disconnect}
                             className="absolute top-2 right-2 text-destructive hover:text-destructive/80 text-xs opacity-0 group-hover:opacity-100 transition-all duration-200 bg-card border border-destructive/20 rounded px-2 py-1 cursor-pointer hover:bg-destructive/10"
@@ -617,7 +592,7 @@ export const WidgetFactory = () => {
                     </Button>
                     {isCorrectNetwork && (
                       <Button
-                        onClick={deployContract}
+                        onClick={registerCreator}
                         disabled={isDeploying}
                         className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -655,31 +630,16 @@ export const WidgetFactory = () => {
                   <h3 className="text-xl font-bold text-foreground mb-4 text-center">🎊 Congratulations!</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div className="bg-card border-2 border-border rounded-lg p-4 shadow-sm">
-                      <div className="text-primary font-semibold mb-2">Contract Address</div>
+                      <div className="text-primary font-semibold mb-2">Shared Contract</div>
                       <div className="font-mono text-xs text-foreground break-all bg-muted/50 p-2 rounded border">{deploymentResult.contractAddress}</div>
                     </div>
                     <div className="bg-card border-2 border-border rounded-lg p-4 shadow-sm">
-                      <div className="text-primary font-semibold mb-2">Transaction Hash</div>
-                      <div className="font-mono text-xs text-foreground break-all bg-muted/50 p-2 rounded border">{deploymentResult.transactionHash}</div>
-                    </div>
-                    <div className="bg-card border-2 border-border rounded-lg p-4 shadow-sm">
-                      <div className="text-primary font-semibold mb-2">Gas Used</div>
-                      <div className="font-mono text-sm text-foreground bg-muted/50 p-2 rounded border">{deploymentResult.gasUsed}</div>
-                    </div>
-                    <div className="bg-card border-2 border-border rounded-lg p-4 shadow-sm">
-                      <div className="text-primary font-semibold mb-2">Total Cost</div>
-                      <div className="font-mono text-sm text-foreground bg-muted/50 p-2 rounded border">{deploymentResult.deploymentCost} ETH</div>
+                      <div className="text-primary font-semibold mb-2">Your Creator Address</div>
+                      <div className="font-mono text-xs text-foreground break-all bg-muted/50 p-2 rounded border">{deploymentResult.creatorAddress}</div>
                     </div>
                   </div>
-                  <div className="mt-6 text-center">
-                    <a
-                      href={`https://sepolia.basescan.org/address/${deploymentResult.contractAddress}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg px-6 py-3 shadow-lg transition-all hover:shadow-xl"
-                    >
-                      🔍 View on BaseScan →
-                    </a>
+                  <div className="mt-4 text-center text-sm text-muted-foreground">
+                    No deployment needed! Tips go to the shared contract and are withdrawable only by you.
                   </div>
                 </div>
 
@@ -719,7 +679,7 @@ export const WidgetFactory = () => {
                     <div className="flex items-start gap-3">
                       <span className="text-accent text-lg">📍</span>
                       <div>
-                        <p className="text-foreground font-medium">Owner address: <span className="font-mono text-xs">{deploymentResult.owner}</span></p>
+                        <p className="text-foreground font-medium">Creator address: <span className="font-mono text-xs">{deploymentResult.creatorAddress}</span></p>
                         <p className="text-muted-foreground text-xs">Funds will be sent to this address when withdrawn</p>
                       </div>
                     </div>

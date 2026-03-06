@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { Button } from '../components/ui/button';
-import { useWeb3 } from '../contexts/Web3Context';
+import { useWeb3 } from '../hooks/useWeb3';
 
 // Network configurations
 const NETWORKS = {
@@ -200,14 +200,13 @@ const CONTRACT_FUNCTIONS = [
 ];
 
 export const ContractPreview = () => {
-  const { network, isConnected } = useWeb3();
+  const { chainId, isConnected } = useWeb3();
   const [activeTab, setActiveTab] = useState<'overview' | 'security' | 'functions' | 'code'>('overview');
   const [selectedNetwork, setSelectedNetwork] = useState<NetworkType>('testnet');
-  
+
   // Get current network info
   const getCurrentNetwork = (): NetworkType | null => {
-    if (!network) return null;
-    const chainId = Number(network.chainId);
+    if (!chainId) return null;
     if (chainId === NETWORKS.mainnet.chainId) return 'mainnet';
     if (chainId === NETWORKS.testnet.chainId) return 'testnet';
     return null;

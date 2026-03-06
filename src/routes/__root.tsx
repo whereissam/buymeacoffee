@@ -4,20 +4,22 @@ import { Web3Provider } from '../contexts/Web3Context'
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { AnimeNavBar } from '../components/ui/anime-navbar'
-import { Home, Coffee, FileSearch, Heart, Info } from 'lucide-react'
+import { Home, Coffee, FileSearch, Heart, Info, PlusCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 const navItems = [
   { name: 'Home', url: '/', icon: Home },
-  { name: 'Create Widget', url: '/factory', icon: Coffee },
+  { name: 'Create', url: '/create', icon: PlusCircle },
+  { name: 'Widget Factory', url: '/factory', icon: Coffee },
   { name: 'Contract', url: '/contract-preview', icon: FileSearch },
-  { name: 'Demo Coffee', url: '/coffee', icon: Heart },
+  { name: 'Demo', url: '/coffee', icon: Heart },
   { name: 'About', url: '/about', icon: Info },
 ]
 
 const RootComponent = () => {
   const location = useLocation()
   const [activeNav, setActiveNav] = useState('Home')
+  const isEmbed = location.pathname.startsWith('/embed/')
 
   useEffect(() => {
     const match = navItems.find((item) => {
@@ -26,6 +28,17 @@ const RootComponent = () => {
     })
     if (match) setActiveNav(match.name)
   }, [location.pathname])
+
+  if (isEmbed) {
+    return (
+      <ThemeProvider>
+        <Web3Provider>
+          <Outlet />
+          <TanStackRouterDevtools />
+        </Web3Provider>
+      </ThemeProvider>
+    )
+  }
 
   return (
     <ThemeProvider>

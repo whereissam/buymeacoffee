@@ -11,11 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as FeaturesRouteImport } from './routes/features'
 import { Route as FactoryRouteImport } from './routes/factory'
+import { Route as CreateRouteImport } from './routes/create'
 import { Route as ContractPreviewRouteImport } from './routes/contract-preview'
 import { Route as CoffeeRouteImport } from './routes/coffee'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TipCreatorIdRouteImport } from './routes/tip.$creatorId'
 import { Route as FactoryStepRouteImport } from './routes/factory.$step'
+import { Route as EmbedCreatorIdRouteImport } from './routes/embed.$creatorId'
 
 const FeaturesRoute = FeaturesRouteImport.update({
   id: '/features',
@@ -25,6 +28,11 @@ const FeaturesRoute = FeaturesRouteImport.update({
 const FactoryRoute = FactoryRouteImport.update({
   id: '/factory',
   path: '/factory',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CreateRoute = CreateRouteImport.update({
+  id: '/create',
+  path: '/create',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContractPreviewRoute = ContractPreviewRouteImport.update({
@@ -47,10 +55,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TipCreatorIdRoute = TipCreatorIdRouteImport.update({
+  id: '/tip/$creatorId',
+  path: '/tip/$creatorId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FactoryStepRoute = FactoryStepRouteImport.update({
   id: '/$step',
   path: '/$step',
   getParentRoute: () => FactoryRoute,
+} as any)
+const EmbedCreatorIdRoute = EmbedCreatorIdRouteImport.update({
+  id: '/embed/$creatorId',
+  path: '/embed/$creatorId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -58,18 +76,24 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/coffee': typeof CoffeeRoute
   '/contract-preview': typeof ContractPreviewRoute
+  '/create': typeof CreateRoute
   '/factory': typeof FactoryRouteWithChildren
   '/features': typeof FeaturesRoute
+  '/embed/$creatorId': typeof EmbedCreatorIdRoute
   '/factory/$step': typeof FactoryStepRoute
+  '/tip/$creatorId': typeof TipCreatorIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/coffee': typeof CoffeeRoute
   '/contract-preview': typeof ContractPreviewRoute
+  '/create': typeof CreateRoute
   '/factory': typeof FactoryRouteWithChildren
   '/features': typeof FeaturesRoute
+  '/embed/$creatorId': typeof EmbedCreatorIdRoute
   '/factory/$step': typeof FactoryStepRoute
+  '/tip/$creatorId': typeof TipCreatorIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,9 +101,12 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/coffee': typeof CoffeeRoute
   '/contract-preview': typeof ContractPreviewRoute
+  '/create': typeof CreateRoute
   '/factory': typeof FactoryRouteWithChildren
   '/features': typeof FeaturesRoute
+  '/embed/$creatorId': typeof EmbedCreatorIdRoute
   '/factory/$step': typeof FactoryStepRoute
+  '/tip/$creatorId': typeof TipCreatorIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -88,27 +115,36 @@ export interface FileRouteTypes {
     | '/about'
     | '/coffee'
     | '/contract-preview'
+    | '/create'
     | '/factory'
     | '/features'
+    | '/embed/$creatorId'
     | '/factory/$step'
+    | '/tip/$creatorId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/about'
     | '/coffee'
     | '/contract-preview'
+    | '/create'
     | '/factory'
     | '/features'
+    | '/embed/$creatorId'
     | '/factory/$step'
+    | '/tip/$creatorId'
   id:
     | '__root__'
     | '/'
     | '/about'
     | '/coffee'
     | '/contract-preview'
+    | '/create'
     | '/factory'
     | '/features'
+    | '/embed/$creatorId'
     | '/factory/$step'
+    | '/tip/$creatorId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -116,8 +152,11 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   CoffeeRoute: typeof CoffeeRoute
   ContractPreviewRoute: typeof ContractPreviewRoute
+  CreateRoute: typeof CreateRoute
   FactoryRoute: typeof FactoryRouteWithChildren
   FeaturesRoute: typeof FeaturesRoute
+  EmbedCreatorIdRoute: typeof EmbedCreatorIdRoute
+  TipCreatorIdRoute: typeof TipCreatorIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -134,6 +173,13 @@ declare module '@tanstack/react-router' {
       path: '/factory'
       fullPath: '/factory'
       preLoaderRoute: typeof FactoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/create': {
+      id: '/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof CreateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contract-preview': {
@@ -164,12 +210,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tip/$creatorId': {
+      id: '/tip/$creatorId'
+      path: '/tip/$creatorId'
+      fullPath: '/tip/$creatorId'
+      preLoaderRoute: typeof TipCreatorIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/factory/$step': {
       id: '/factory/$step'
       path: '/$step'
       fullPath: '/factory/$step'
       preLoaderRoute: typeof FactoryStepRouteImport
       parentRoute: typeof FactoryRoute
+    }
+    '/embed/$creatorId': {
+      id: '/embed/$creatorId'
+      path: '/embed/$creatorId'
+      fullPath: '/embed/$creatorId'
+      preLoaderRoute: typeof EmbedCreatorIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -190,8 +250,11 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   CoffeeRoute: CoffeeRoute,
   ContractPreviewRoute: ContractPreviewRoute,
+  CreateRoute: CreateRoute,
   FactoryRoute: FactoryRouteWithChildren,
   FeaturesRoute: FeaturesRoute,
+  EmbedCreatorIdRoute: EmbedCreatorIdRoute,
+  TipCreatorIdRoute: TipCreatorIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

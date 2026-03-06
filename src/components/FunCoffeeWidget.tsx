@@ -1,29 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
-import { useWeb3 } from '../contexts/Web3Context';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther, formatEther } from 'viem';
+import { useWeb3 } from '../hooks/useWeb3';
+import { GIVE_ME_COFFEE_ABI } from '../config/contract';
 import { Button } from './ui/button';
 import { MessageCustomizer } from './MessageCustomizer';
 
-const CONTRACT_ABI = [
-  "function donate(string memory _message) external payable",
-  "function withdraw() external",
-  "function getBalance() external view returns (uint256)",
-  "function totalDonations() external view returns (uint256)",
-  "function owner() external view returns (address)",
-  "function getRecentDonations(uint256 count) external view returns (address[] memory, uint256[] memory, string[] memory, uint256[] memory)",
-  "event DonationReceived(address indexed donor, uint256 amount, string message, uint256 timestamp)"
-];
-
 interface FunCoffeeWidgetProps {
-  contractAddress: string;
+  contractAddress: `0x${string}`;
+  creatorAddress: `0x${string}`;
   title?: string;
-}
-
-interface Donation {
-  donor: string;
-  amount: string;
-  message: string;
-  timestamp: number;
 }
 
 interface CoffeeAchievement {
@@ -53,7 +39,7 @@ const BREWING_STAGES = [
 
 const THANK_YOU_MESSAGES = [
   "You're brew-tiful! ☕✨",
-  "Thanks a latte! 🥛💕", 
+  "Thanks a latte! 🥛💕",
   "You're my cup of tea! 🫖💚",
   "Coffee makes everything better! ☕🌟",
   "Fueling creativity, one sip at a time! 🚀☕",
@@ -62,20 +48,17 @@ const THANK_YOU_MESSAGES = [
   "Grounds for celebration! 🎉☕"
 ];
 
-export const FunCoffeeWidget: React.FC<FunCoffeeWidgetProps> = ({ 
-  contractAddress, 
-  title = "Brew Me Some Magic! ✨☕" 
+export const FunCoffeeWidget: React.FC<FunCoffeeWidgetProps> = ({
+  contractAddress,
+  creatorAddress,
+  title = "Brew Me Some Magic! ✨☕"
 }) => {
-  const { signer, userAddress, isConnected, isCorrectNetwork, connectWallet, switchToBase, error: web3Error } = useWeb3();
-  
+  const { userAddress, isConnected, isCorrectNetwork, connectWallet, switchToBase } = useWeb3();
+
   const [selectedAmount, setSelectedAmount] = useState("0.001");
   const [message, setMessage] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [contractBalance, setContractBalance] = useState<string>("0");
-  const [totalDonations, setTotalDonations] = useState<string>("0");
-  const [recentDonations, setRecentDonations] = useState<Donation[]>([]);
-  const [isOwner, setIsOwner] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   const [brewingStage, setBrewingStage] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
   const [currentAchievement, setCurrentAchievement] = useState<CoffeeAchievement | null>(null);
@@ -91,13 +74,38 @@ export const FunCoffeeWidget: React.FC<FunCoffeeWidgetProps> = ({
     { value: "0.05", label: "Coffee Bar", emoji: "🏪", description: "Opening a shop!" }
   ];
 
-  const getContract = () => {
-    if (!signer || !contractAddress) return null;
-    return new ethers.Contract(contractAddress, CONTRACT_ABI, signer);
-  };
+  // Read creator balance
+  const { data: creatorBalance, refetch: refetchBalance } = useReadContract({
+    address: contractAddress,
+    abi: GIVE_ME_COFFEE_ABI,
+    functionName: 'getBalance',
+    args: [creatorAddress],
+  });
+
+  // Read lifetime total
+  const { data: lifetimeTotal, refetch: refetchLifetime } = useReadContract({
+    address: contractAddress,
+    abi: GIVE_ME_COFFEE_ABI,
+    functionName: 'getLifetimeTotal',
+    args: [creatorAddress],
+  });
+
+  // Write: donate
+  const { writeContract: donate, data: donateTxHash, isPending: isDonating } = useWriteContract();
+
+  // Write: withdraw
+  const { writeContract: withdraw, data: withdrawTxHash, isPending: isWithdrawing } = useWriteContract();
+
+  // Wait for donate tx
+  const { isSuccess: donateSuccess } = useWaitForTransactionReceipt({ hash: donateTxHash });
+
+  // Wait for withdraw tx
+  const { isSuccess: withdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawTxHash });
+
+  const isOwner = userAddress?.toLowerCase() === creatorAddress.toLowerCase();
 
   const playBrewingAnimation = async () => {
-    setIsLoading(true);
+    setIsAnimating(true);
     for (let i = 0; i < BREWING_STAGES.length; i++) {
       setBrewingStage(i);
       setStatusMessage(BREWING_STAGES[i].stage + " " + BREWING_STAGES[i].emoji);
@@ -132,134 +140,86 @@ export const FunCoffeeWidget: React.FC<FunCoffeeWidgetProps> = ({
     const achievement = COFFEE_ACHIEVEMENTS
       .filter(a => numAmount >= a.threshold)
       .sort((a, b) => b.threshold - a.threshold)[0];
-    
+
     if (achievement) {
       setCurrentAchievement(achievement);
       setTimeout(() => setCurrentAchievement(null), 5000);
     }
   };
 
-  const loadContractData = async () => {
-    try {
-      const contract = getContract();
-      if (!contract) return;
-
-      const [balance, total, owner, donations] = await Promise.all([
-        contract.getBalance(),
-        contract.totalDonations(),
-        contract.owner(),
-        contract.getRecentDonations(5)
-      ]);
-
-      setContractBalance(ethers.formatEther(balance));
-      setTotalDonations(ethers.formatEther(total));
-      setIsOwner(userAddress?.toLowerCase() === owner.toLowerCase());
-
-      const [donors, amounts, messages, timestamps] = donations;
-      const formattedDonations: Donation[] = donors.map((donor: string, index: number) => ({
-        donor,
-        amount: ethers.formatEther(amounts[index]),
-        message: messages[index],
-        timestamp: Number(timestamps[index])
-      }));
-
-      setRecentDonations(formattedDonations);
-    } catch (err) {
-      console.error('Failed to load contract data:', err);
-    }
-  };
-
-  const sendDonation = async () => {
-    if (!signer || !contractAddress) return;
-
-    try {
-      await playBrewingAnimation();
-      
-      const contract = getContract();
-      if (!contract) throw new Error('Contract not available');
-
-      const donationAmount = ethers.parseEther(selectedAmount);
-      
-      setStatusMessage("Sending your coffee order... ☕📡");
-      const tx = await contract.donate(message, { value: donationAmount });
-      
-      setStatusMessage("Your coffee is being prepared... ⏳✨");
-      await tx.wait();
-      
-      // Success animations
+  useEffect(() => {
+    if (donateSuccess) {
       createFloatingReaction();
       createCoffeeParticles();
       checkAchievement(selectedAmount);
       setShowSuccess(true);
-      
       const thankYouMessage = THANK_YOU_MESSAGES[Math.floor(Math.random() * THANK_YOU_MESSAGES.length)];
       setStatusMessage(thankYouMessage);
       setMessage("");
-      
-      // Reload contract data
-      await loadContractData();
-      
+      refetchBalance();
+      refetchLifetime();
       setTimeout(() => {
         setStatusMessage("");
         setShowSuccess(false);
+        setIsAnimating(false);
       }, 6000);
-      
-    } catch (err: any) {
-      console.error('Donation failed:', err);
-      if (err.code === 'ACTION_REJECTED') {
-        setStatusMessage("Order cancelled - maybe next time? 😊");
-      } else if (err.code === 'INSUFFICIENT_FUNDS') {
-        setStatusMessage("Oops! Your wallet needs more ETH ☕💔");
-      } else {
-        setStatusMessage("Something went wrong with your order! 😅");
-      }
-      setTimeout(() => setStatusMessage(""), 5000);
-    } finally {
-      setIsLoading(false);
-      setBrewingStage(0);
     }
-  };
-
-  const withdrawFunds = async () => {
-    if (!signer || !isOwner) return;
-
-    try {
-      setIsLoading(true);
-      setStatusMessage("Collecting coffee tips... 💰☕");
-
-      const contract = getContract();
-      if (!contract) throw new Error('Contract not available');
-
-      const tx = await contract.withdraw();
-      await tx.wait();
-
-      createFloatingReaction();
-      setStatusMessage("Tips collected successfully! Time for a celebration coffee! 🎉☕");
-      await loadContractData();
-      
-      setTimeout(() => setStatusMessage(""), 5000);
-    } catch (err: any) {
-      console.error('Withdrawal failed:', err);
-      setStatusMessage("Withdrawal failed - try again! ☕😅");
-      setTimeout(() => setStatusMessage(""), 5000);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [donateSuccess]);
 
   useEffect(() => {
-    if (isConnected && isCorrectNetwork && signer) {
-      loadContractData();
+    if (withdrawSuccess) {
+      createFloatingReaction();
+      setStatusMessage("Tips collected successfully! Time for a celebration coffee! 🎉☕");
+      refetchBalance();
+      setTimeout(() => setStatusMessage(""), 5000);
     }
-  }, [isConnected, isCorrectNetwork, signer, contractAddress]);
+  }, [withdrawSuccess]);
+
+  const sendDonation = async () => {
+    await playBrewingAnimation();
+    setStatusMessage("Sending your coffee order... ☕📡");
+    donate({
+      address: contractAddress,
+      abi: GIVE_ME_COFFEE_ABI,
+      functionName: 'donate',
+      args: [creatorAddress, message],
+      value: parseEther(selectedAmount),
+    }, {
+      onError: (err) => {
+        console.error('Donation failed:', err);
+        if (err.message.includes('User rejected')) {
+          setStatusMessage("Order cancelled - maybe next time? 😊");
+        } else {
+          setStatusMessage("Something went wrong with your order! 😅");
+        }
+        setIsAnimating(false);
+        setTimeout(() => setStatusMessage(""), 5000);
+      }
+    });
+  };
+
+  const withdrawFunds = () => {
+    setStatusMessage("Collecting coffee tips... 💰☕");
+    withdraw({
+      address: contractAddress,
+      abi: GIVE_ME_COFFEE_ABI,
+      functionName: 'withdraw',
+    }, {
+      onError: (err) => {
+        console.error('Withdrawal failed:', err);
+        setStatusMessage("Withdrawal failed - try again! ☕😅");
+        setTimeout(() => setStatusMessage(""), 5000);
+      }
+    });
+  };
 
   const formatAddress = (address: string) => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
-  const formatTimestamp = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString();
-  };
+  const balanceDisplay = creatorBalance ? formatEther(creatorBalance) : "0";
+  const lifetimeDisplay = lifetimeTotal ? formatEther(lifetimeTotal) : "0";
+  const isLoading = isDonating || isWithdrawing || isAnimating;
 
   return (
     <div className="relative coffee-widget w-full max-w-md mx-auto bg-gradient-to-br from-card to-accent/10 border-2 border-border rounded-3xl shadow-2xl p-4 sm:p-6 lg:p-8 overflow-hidden">
@@ -313,15 +273,9 @@ export const FunCoffeeWidget: React.FC<FunCoffeeWidgetProps> = ({
         </h2>
         <div className="text-4xl animate-pulse">☕✨☕</div>
       </div>
-      
-      {web3Error && (
-        <div className="bg-destructive/10 border-2 border-destructive text-destructive-foreground px-4 py-3 rounded-lg mb-4 animate-shake">
-          <strong>Oops! ☕💔</strong> {web3Error}
-        </div>
-      )}
 
       {!isConnected ? (
-        <Button 
+        <Button
           onClick={connectWallet}
           className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-primary-foreground py-4 text-lg font-bold rounded-xl shadow-lg transform hover:scale-105 transition-all duration-200"
         >
@@ -332,7 +286,7 @@ export const FunCoffeeWidget: React.FC<FunCoffeeWidgetProps> = ({
           <div className="bg-destructive/10 border-2 border-destructive text-destructive-foreground px-4 py-3 rounded-lg mb-4 animate-pulse">
             <strong>Wrong Network! 🌐</strong> Let's switch to Base for the best coffee experience!
           </div>
-          <Button 
+          <Button
             onClick={switchToBase}
             className="w-full bg-gradient-to-r from-secondary to-accent hover:from-secondary/90 hover:to-accent/90 text-secondary-foreground py-4 rounded-xl"
           >
@@ -391,13 +345,13 @@ export const FunCoffeeWidget: React.FC<FunCoffeeWidgetProps> = ({
             </Button>
           )}
 
-          {isOwner && parseFloat(contractBalance) > 0 && (
+          {isOwner && parseFloat(balanceDisplay) > 0 && (
             <Button
               onClick={withdrawFunds}
               disabled={isLoading}
               className="w-full bg-gradient-to-r from-secondary to-destructive hover:from-secondary/90 hover:to-destructive/90 text-secondary-foreground py-3 rounded-xl mb-4"
             >
-              💰 Collect Coffee Tips ({contractBalance} ETH) 🎉
+              💰 Collect Coffee Tips ({parseFloat(balanceDisplay).toFixed(4)} ETH) 🎉
             </Button>
           )}
 
@@ -405,69 +359,28 @@ export const FunCoffeeWidget: React.FC<FunCoffeeWidgetProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <div className="font-bold">☕ Coffee Fund</div>
-                <div>{parseFloat(contractBalance).toFixed(4)} ETH</div>
+                <div>{parseFloat(balanceDisplay).toFixed(4)} ETH</div>
               </div>
               <div>
                 <div className="font-bold">🎯 Total Brewed</div>
-                <div>{parseFloat(totalDonations).toFixed(4)} ETH</div>
+                <div>{parseFloat(lifetimeDisplay).toFixed(4)} ETH</div>
               </div>
             </div>
           </div>
-
-          {recentDonations.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-xl font-bold text-foreground mb-4 text-center">☕ Recent Coffee Lovers 💕</h3>
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {recentDonations.map((donation, index) => (
-                  <div key={index} className="bg-card/70 border border-border p-4 rounded-xl shadow-md hover:shadow-lg transition-shadow">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="font-bold text-primary text-lg">
-                          ☕ {parseFloat(donation.amount).toFixed(4)} ETH
-                        </div>
-                        <div className="text-xs text-muted-foreground mb-2">
-                          {formatAddress(donation.donor)} • {formatTimestamp(donation.timestamp)}
-                        </div>
-                        {donation.message && (
-                          <div className="text-sm text-foreground bg-accent/10 border border-accent/20 p-2 rounded-lg">
-                            💌 "{donation.message}"
-                          </div>
-                        )}
-                      </div>
-                      <div className="text-2xl animate-pulse">
-                        {COFFEE_REACTIONS[index % COFFEE_REACTIONS.length]}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </>
       )}
 
-      {statusMessage && (
+      {statusMessage && !isLoading && (
         <div className="mt-6 text-center">
           <div className={`text-lg font-bold p-4 rounded-xl border ${
-            showSuccess 
-              ? 'bg-accent/20 text-accent-foreground border-accent/40 animate-bounce' 
+            showSuccess
+              ? 'bg-accent/20 text-accent-foreground border-accent/40 animate-bounce'
               : 'bg-primary/20 text-primary-foreground border-primary/40'
           }`}>
             {statusMessage}
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-        .animate-shake {
-          animation: shake 0.5s ease-in-out;
-        }
-      `}</style>
     </div>
   );
 };
