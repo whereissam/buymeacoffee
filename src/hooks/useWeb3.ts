@@ -5,13 +5,39 @@ import { baseSepolia } from 'wagmi/chains'
 const BASE_MAINNET_CHAIN_ID = 8453
 const BASE_SEPOLIA_CHAIN_ID = 84532
 
+// E2E test mock: set window.__E2E_WALLET_MOCK__ to override wallet state in tests
+interface E2EWalletMock {
+  address: string
+  isConnected: boolean
+  chainId: number
+}
+
+declare global {
+  interface Window {
+    __E2E_WALLET_MOCK__?: E2EWalletMock
+  }
+}
+
+function getE2EMock(): E2EWalletMock | undefined {
+  if (typeof window !== 'undefined' && import.meta.env.DEV) {
+    return window.__E2E_WALLET_MOCK__
+  }
+  return undefined
+}
+
 export function useWeb3() {
   const { address, isConnected, chain } = useAccount()
   const { disconnect } = useDisconnect()
   const { switchChainAsync } = useSwitchChain()
   const { open } = useAppKit()
 
-  const isCorrectNetwork = chain?.id === BASE_MAINNET_CHAIN_ID || chain?.id === BASE_SEPOLIA_CHAIN_ID
+  const mock = getE2EMock()
+
+  const effectiveAddress = mock?.address ?? address ?? null
+  const effectiveConnected = mock?.isConnected ?? isConnected
+  const effectiveChainId = mock?.chainId ?? chain?.id ?? null
+
+  const isCorrectNetwork = effectiveChainId === BASE_MAINNET_CHAIN_ID || effectiveChainId === BASE_SEPOLIA_CHAIN_ID
 
   const connectWallet = async () => {
     try {
@@ -30,10 +56,10 @@ export function useWeb3() {
   }
 
   return {
-    userAddress: address ?? null,
-    isConnected,
+    userAddress: effectiveAddress as `0x${string}` | null,
+    isConnected: effectiveConnected,
     isCorrectNetwork,
-    chainId: chain?.id ?? null,
+    chainId: effectiveChainId,
     connectWallet,
     switchToBase,
     disconnect,

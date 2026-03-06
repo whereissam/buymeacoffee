@@ -1,4 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
+import { execFileSync } from 'child_process';
+
+function hasBun(): boolean {
+  try {
+    execFileSync('bun', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const devCommand = hasBun() ? 'bun run dev' : 'npm run dev';
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -70,7 +82,7 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npm run dev',
+    command: devCommand,
     url: 'http://localhost:5174',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,

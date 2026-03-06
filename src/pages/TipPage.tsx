@@ -142,6 +142,12 @@ export default function TipPage() {
     if (isTxPending && donateTxHash) setTxState('pending')
   }, [isTxPending, donateTxHash])
 
+  const triggerHaptic = useCallback(() => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate([50, 30, 80])
+    }
+  }, [])
+
   useEffect(() => {
     if (isTxSuccess) {
       setTxState('success')
@@ -156,12 +162,6 @@ export default function TipPage() {
   }, [isTxError])
 
   const effectiveAmount = customAmount || selectedAmount
-
-  const triggerHaptic = useCallback(() => {
-    if ('vibrate' in navigator) {
-      navigator.vibrate([50, 30, 80])
-    }
-  }, [])
 
   const handleDonate = () => {
     if (!creatorAddress || !effectiveAmount) return

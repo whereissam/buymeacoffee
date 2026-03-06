@@ -90,25 +90,25 @@
 ## Phase 4: Testing & Security (Week 5)
 
 ### E2E Tests (Playwright)
-- [ ] Creator setup flow end-to-end
-- [ ] Donation page renders correctly
-- [ ] Wallet connection UI states
-- [ ] Network switch prompt
-- [ ] Form validation (amounts, message length)
-- [ ] Responsive design (mobile + desktop viewports)
-- [ ] Iframe embed renders correctly
-- [ ] Theme switching
+- [x] Creator setup flow end-to-end
+- [x] Donation page renders correctly
+- [x] Wallet connection UI states
+- [x] Network switch prompt
+- [x] Form validation (amounts, message length)
+- [x] Responsive design (mobile + desktop viewports)
+- [x] Iframe embed renders correctly
+- [x] Theme switching
 
 ### Security
-- [ ] Smart contract security review
-  - [ ] Reentrancy protection verified
-  - [ ] No integer overflow (Solidity 0.8+ built-in)
-  - [ ] No front-running concerns
-  - [ ] withdraw() only sends to msg.sender
-- [ ] Frontend security
-  - [ ] No XSS in message display
-  - [ ] Input sanitization
-  - [ ] No sensitive data in localStorage
+- [x] Smart contract security review
+  - [x] Reentrancy protection verified
+  - [x] No integer overflow (Solidity 0.8+ built-in)
+  - [x] No front-running concerns
+  - [x] withdraw() only sends to msg.sender
+- [x] Frontend security
+  - [x] No XSS in message display
+  - [x] Input sanitization
+  - [x] No sensitive data in localStorage
 
 ### Cross-Browser Testing
 - [ ] Chrome
