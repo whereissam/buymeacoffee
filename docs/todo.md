@@ -128,10 +128,10 @@
 - [ ] Update contract address in frontend config
 
 ### Documentation
-- [ ] Creator onboarding guide
-- [ ] Widget integration guide (iframe, badge)
-- [ ] FAQ: gas costs, withdrawal, security
-- [ ] Troubleshooting: wrong network, failed tx, wallet issues
+- [x] Creator onboarding guide (`docs/creator-onboarding-guide.md`)
+- [x] Widget integration guide (iframe, badge) (`docs/widget-integration-guide.md`)
+- [x] FAQ: gas costs, withdrawal, security (`docs/faq.md`)
+- [x] Troubleshooting: wrong network, failed tx, wallet issues (`docs/troubleshooting.md`)
 
 ### Launch
 - [ ] Smoke test on mainnet with small amounts
