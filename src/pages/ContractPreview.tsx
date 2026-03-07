@@ -26,175 +26,119 @@ const NETWORKS = {
 type NetworkType = keyof typeof NETWORKS;
 
 const CONTRACT_SOURCE = `// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.27;
+pragma solidity ^0.8.20;
 
-contract GiveMeCoffee {
-    address public owner;
-    uint256 public totalDonations;
-    
-    struct Donation {
-        address donor;
-        uint256 amount;
-        string message;
-        uint256 timestamp;
-    }
-    
-    Donation[] public donations;
-    
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+
+/// @title GiveMeCoffee - Shared tipping protocol for Base
+/// @notice One contract serves all creators. Non-custodial: each creator withdraws their own balance.
+contract GiveMeCoffee is ReentrancyGuard {
+    mapping(address => uint256) public balances;
+    mapping(address => uint256) public totalDonatedLifetime;
+
     event DonationReceived(
+        address indexed creator,
         address indexed donor,
         uint256 amount,
         string message,
         uint256 timestamp
     );
-    
+
     event WithdrawalMade(
-        address indexed recipient,
+        address indexed creator,
         uint256 amount,
         uint256 timestamp
     );
-    
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
-        _;
+
+    /// @notice Donate ETH to a creator with an optional short message
+    /// @param creator The address of the creator to tip
+    /// @param message A short memo (max 64 bytes)
+    function donate(address creator, string calldata message) external payable {
+        require(msg.value > 0, "Must send ETH");
+        require(creator != address(0), "Invalid creator");
+        require(bytes(message).length <= 64, "Message too long");
+
+        balances[creator] += msg.value;
+        totalDonatedLifetime[creator] += msg.value;
+
+        emit DonationReceived(creator, msg.sender, msg.value, message, block.timestamp);
     }
-    
-    constructor() {
-        owner = msg.sender;
-    }
-    
+
+    /// @notice Direct ETH transfers are rejected to force proper attribution via donate()
     receive() external payable {
-        require(msg.value > 0, "Donation must be greater than 0");
-        totalDonations += msg.value;
-        
-        donations.push(Donation({
-            donor: msg.sender,
-            amount: msg.value,
-            message: "",
-            timestamp: block.timestamp
-        }));
-        
-        emit DonationReceived(msg.sender, msg.value, "", block.timestamp);
+        revert("Use donate()");
     }
-    
-    function donate(string memory _message) external payable {
-        require(msg.value > 0, "Donation must be greater than 0");
-        totalDonations += msg.value;
-        
-        donations.push(Donation({
-            donor: msg.sender,
-            amount: msg.value,
-            message: _message,
-            timestamp: block.timestamp
-        }));
-        
-        emit DonationReceived(msg.sender, msg.value, _message, block.timestamp);
+
+    /// @notice Creator withdraws their full accumulated balance
+    function withdraw() external nonReentrant {
+        uint256 amount = balances[msg.sender];
+        require(amount > 0, "No balance");
+
+        balances[msg.sender] = 0;
+
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Transfer failed");
+
+        emit WithdrawalMade(msg.sender, amount, block.timestamp);
     }
-    
-    function withdraw() external onlyOwner {
-        uint256 balance = address(this).balance;
-        require(balance > 0, "No funds to withdraw");
-        
-        (bool success, ) = payable(owner).call{value: balance}("");
-        require(success, "Withdrawal failed");
-        
-        emit WithdrawalMade(owner, balance, block.timestamp);
+
+    /// @notice Get a creator's current withdrawable balance
+    function getBalance(address creator) external view returns (uint256) {
+        return balances[creator];
     }
-    
-    function getBalance() external view returns (uint256) {
-        return address(this).balance;
-    }
-    
-    function getDonationCount() external view returns (uint256) {
-        return donations.length;
-    }
-    
-    function getDonation(uint256 index) external view returns (
-        address donor,
-        uint256 amount,
-        string memory message,
-        uint256 timestamp
-    ) {
-        require(index < donations.length, "Donation index out of bounds");
-        Donation memory donation = donations[index];
-        return (donation.donor, donation.amount, donation.message, donation.timestamp);
-    }
-    
-    function getRecentDonations(uint256 count) external view returns (
-        address[] memory donors,
-        uint256[] memory amounts,
-        string[] memory messages,
-        uint256[] memory timestamps
-    ) {
-        uint256 totalCount = donations.length;
-        uint256 returnCount = count > totalCount ? totalCount : count;
-        
-        if (returnCount == 0) {
-            return (new address[](0), new uint256[](0), new string[](0), new uint256[](0));
-        }
-        
-        donors = new address[](returnCount);
-        amounts = new uint256[](returnCount);
-        messages = new string[](returnCount);
-        timestamps = new uint256[](returnCount);
-        
-        for (uint256 i = 0; i < returnCount; i++) {
-            uint256 donationIndex = totalCount - 1 - i;
-            Donation memory donation = donations[donationIndex];
-            donors[i] = donation.donor;
-            amounts[i] = donation.amount;
-            messages[i] = donation.message;
-            timestamps[i] = donation.timestamp;
-        }
+
+    /// @notice Get a creator's lifetime total donations received
+    function getLifetimeTotal(address creator) external view returns (uint256) {
+        return totalDonatedLifetime[creator];
     }
 }`;
 
 const SECURITY_FEATURES = [
   {
-    title: "🔒 Owner-Only Withdrawals",
-    description: "Only the contract deployer can withdraw funds",
-    code: "modifier onlyOwner()"
+    title: "🔒 Reentrancy Protection",
+    description: "Inherits OpenZeppelin's ReentrancyGuard to prevent reentrancy attacks on withdrawals",
+    code: "contract GiveMeCoffee is ReentrancyGuard { ... function withdraw() external nonReentrant { ... } }"
   },
   {
-    title: "💰 Safe Fund Handling",
-    description: "Uses secure withdrawal patterns and prevents reentrancy",
-    code: "(bool success, ) = payable(owner).call{value: balance}(\"\");"
+    title: "💰 Per-Creator Balance Isolation",
+    description: "Each creator's balance is tracked independently — no shared pool, no owner key",
+    code: "mapping(address => uint256) public balances;"
   },
   {
     title: "✅ Input Validation",
-    description: "Requires donations to be greater than 0",
-    code: "require(msg.value > 0, \"Donation must be greater than 0\");"
+    description: "Validates donation amount, creator address, and enforces a 64-byte message cap",
+    code: "require(msg.value > 0); require(creator != address(0)); require(bytes(message).length <= 64);"
   },
   {
-    title: "📊 Transparent Records",
-    description: "All donations are publicly viewable on the blockchain",
-    code: "Donation[] public donations;"
+    title: "🚫 Direct Transfer Rejection",
+    description: "Plain ETH transfers are rejected to ensure proper creator attribution via donate()",
+    code: "receive() external payable { revert(\"Use donate()\"); }"
   }
 ];
 
 const CONTRACT_FUNCTIONS = [
   {
-    name: "donate(string message)",
+    name: "donate(address creator, string message)",
     type: "payable",
-    description: "Send ETH with a custom message",
+    description: "Send ETH to a specific creator with an optional message (max 64 bytes)",
     emoji: "☕"
   },
   {
     name: "withdraw()",
-    type: "owner",
-    description: "Owner can withdraw all donated funds",
+    type: "write",
+    description: "Creator withdraws their full accumulated balance to their own wallet",
     emoji: "💰"
   },
   {
-    name: "getBalance()",
+    name: "getBalance(address creator)",
     type: "view",
-    description: "Check current contract balance",
+    description: "Check a creator's current withdrawable balance",
     emoji: "📊"
   },
   {
-    name: "getRecentDonations()",
+    name: "getLifetimeTotal(address creator)",
     type: "view",
-    description: "Get list of recent donations",
+    description: "Get a creator's lifetime total donations received",
     emoji: "📜"
   }
 ];
@@ -224,7 +168,7 @@ export const ContractPreview = () => {
             ☕ GiveMeCoffee Smart Contract
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-6 px-4">
-            A secure, transparent smart contract for receiving coffee donations on Base network.
+            A shared, non-custodial tipping protocol for creators on Base network.
             {selectedNetwork === 'testnet' 
               ? ' Currently viewing testnet version for safe testing with free test ETH.'
               : ' Currently viewing mainnet version for production use with real ETH.'
@@ -328,8 +272,8 @@ export const ContractPreview = () => {
                     ☕ What is GiveMeCoffee?
                   </h2>
                   <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto px-2 mb-4">
-                    A simple, secure smart contract that allows supporters to send you cryptocurrency donations 
-                    with personalized messages. Think of it as a decentralized tip jar for the Web3 era!
+                    A shared, non-custodial tipping protocol on Base. One contract serves all creators —
+                    supporters donate to any creator's address, and each creator withdraws their own balance directly.
                   </p>
                   
                   {/* Network-specific info */}
@@ -369,7 +313,7 @@ export const ContractPreview = () => {
                       <li className="flex items-start gap-3">
                         <span className="text-green-500">✅</span>
                         <div>
-                          <strong>Full Control:</strong> You own the contract and can withdraw anytime
+                          <strong>Non-Custodial:</strong> Each creator withdraws their own balance — no middleman
                         </div>
                       </li>
                       <li className="flex items-start gap-3">
@@ -387,24 +331,24 @@ export const ContractPreview = () => {
                       <div className="flex items-start gap-3">
                         <div className="bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">1</div>
                         <div>
-                          <strong>Deploy Contract:</strong> You become the owner automatically
+                          <strong>Share Your Page:</strong> Give supporters your creator address or tipping link
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
                         <div className="bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">2</div>
                         <div>
-                          <strong>Receive Donations:</strong> ETH accumulates in the contract
+                          <strong>Receive Donations:</strong> ETH accumulates in your per-creator balance
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
                         <div className="bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">3</div>
                         <div>
-                          <strong>Click "Collect Tips":</strong> Withdraws all ETH to your wallet
+                          <strong>Click "Collect Tips":</strong> Withdraws your full balance to your wallet
                         </div>
                       </div>
                       <div className="bg-primary/20 border border-primary/30 rounded-lg p-3 mt-4">
                         <p className="text-sm text-foreground">
-                          <strong>💡 Note:</strong> Only the contract deployer (owner) can withdraw funds. All donations go directly to your wallet address when you claim them.
+                          <strong>💡 Note:</strong> This is a shared protocol — no owner, no middleman. Each creator withdraws their own balance directly. Your funds are always under your control.
                         </p>
                       </div>
                     </div>
@@ -527,7 +471,7 @@ export const ContractPreview = () => {
                   <ul className="space-y-2 text-muted-foreground">
                     <li>• Contract is verified and immutable once deployed</li>
                     <li>• No hidden functions or backdoors</li>
-                    <li>• Uses Solidity 0.8.27 with built-in overflow protection</li>
+                    <li>• Uses Solidity 0.8.20+ with built-in overflow protection</li>
                     <li>• Follows OpenZeppelin security patterns</li>
                     <li>• All transactions are recorded on-chain for transparency</li>
                   </ul>
@@ -556,7 +500,7 @@ export const ContractPreview = () => {
                           <h3 className="text-xl font-bold text-foreground">{func.name}</h3>
                           <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${
                             func.type === 'payable' ? 'bg-primary/20 text-primary-foreground' :
-                            func.type === 'owner' ? 'bg-destructive/20 text-destructive-foreground' :
+                            func.type === 'write' ? 'bg-destructive/20 text-destructive-foreground' :
                             'bg-secondary/20 text-secondary-foreground'
                           }`}>
                             {func.type}
@@ -575,7 +519,7 @@ export const ContractPreview = () => {
                       <strong className="text-primary">Payable:</strong> Can receive ETH when called
                     </div>
                     <div>
-                      <strong className="text-destructive">Owner:</strong> Only contract owner can call
+                      <strong className="text-destructive">Write:</strong> Modifies on-chain state, costs gas
                     </div>
                     <div>
                       <strong className="text-secondary">View:</strong> Read-only, no gas cost
