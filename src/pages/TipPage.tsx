@@ -332,6 +332,7 @@ export default function TipPage() {
                     type="number"
                     step="0.001"
                     min="0"
+                    max="100"
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
                     placeholder="0.00"
